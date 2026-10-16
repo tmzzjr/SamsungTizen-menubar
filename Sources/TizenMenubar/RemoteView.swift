@@ -316,7 +316,7 @@ struct RemoteView: View {
             }
             PanelCard {
                 VStack(spacing: 9) {
-                    HStack { Label("Swipe pad", systemImage: "hand.draw").fontWeight(.semibold); Spacer(); Text("Swipe to move · tap for OK").font(.system(size: 9)).foregroundStyle(mutedInk) }
+                    HStack { Label("Swipe pad", systemImage: "hand.draw").fontWeight(.semibold); Spacer(); Text(store.pointerMode ? "Drag the pointer · tap to click" : "Swipe to move · tap for OK").font(.system(size: 9)).foregroundStyle(mutedInk) }
                     RoundedRectangle(cornerRadius: 12).fill(accent.opacity(0.065)).overlay(Image(systemName: "hand.draw").font(.system(size: 25, weight: .light)).foregroundStyle(accent.opacity(0.7)))
                         .frame(height: 85).contentShape(Rectangle())
                         .gesture(DragGesture(minimumDistance: 4).onChanged { value in
@@ -324,7 +324,7 @@ struct RemoteView: View {
                             swipeTranslation = value.translation
                             store.swipePointer(dx: delta.width, dy: delta.height)
                         }.onEnded { _ in swipeTranslation = .zero; store.endSwipe() })
-                        .simultaneousGesture(TapGesture().onEnded { store.press("KEY_ENTER") })
+                        .simultaneousGesture(TapGesture().onEnded { store.tapSwipe() })
                         .accessibilityLabel("TV swipe pad")
                 }.disabled(!store.connected)
             }

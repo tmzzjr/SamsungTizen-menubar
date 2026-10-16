@@ -25,12 +25,24 @@ struct TVActivity: Equatable {
     mutating func reset() { focus = .unknown; homeShown = false }
 }
 
-/// Turns touchpad drags into arrow keys, one key per `step` points along the main axis.
+/// Turns touchpad drags into arrow keys, one key per `step` points along the main axis,
+/// or into pointer moves scaled by `gain` where the TV shows a pointer.
 struct SwipePad {
     let step: Double
+    let gain: Double
     private var x = 0.0
     private var y = 0.0
-    init(step: Double = 34) { self.step = step }
+    private var pointerX = 0.0
+    private var pointerY = 0.0
+    init(step: Double = 34, gain: Double = 3) { self.step = step; self.gain = gain }
+    /// Whole pointer units only; the fractions carry over to the next move.
+    mutating func pointer(dx: Double, dy: Double) -> (x: Int, y: Int)? {
+        pointerX += dx * gain; pointerY += dy * gain
+        let moveX = Int(pointerX), moveY = Int(pointerY)
+        guard moveX != 0 || moveY != 0 else { return nil }
+        pointerX -= Double(moveX); pointerY -= Double(moveY)
+        return (moveX, moveY)
+    }
     mutating func drag(dx: Double, dy: Double) -> [String] {
         x += dx; y += dy
         var keys: [String] = []
@@ -40,5 +52,5 @@ struct SwipePad {
         }
         return keys
     }
-    mutating func end() { x = 0; y = 0 }
+    mutating func end() { x = 0; y = 0; pointerX = 0; pointerY = 0 }
 }

@@ -24,6 +24,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     @Published var muted = false
     @Published private(set) var activity = TVActivity()
     @Published var textInputOpen = false
+    /// The TV screen takes a pointer (its web browser), so the swipe pad moves the pointer instead of sending arrows.
+    @Published var pointerMode = false
     @Published var error: String?
     @Published var notice: String?
     @Published var events: [RemoteEvent] = []
@@ -118,9 +120,10 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         client.onPairing = { [weak self] in self?.pairing = true }
         client.onEvent = { [weak self] title, detail in self?.log(title, detail) }
         client.onTextInput = { [weak self] open in self?.textInputOpen = open }
+        client.onPointer = { [weak self] active in self?.pointerMode = active }
         client.onDisconnect = { [weak self, weak client] failure in
             guard let self, self.connection === client else { return }
-            self.connected = false; self.hasVolume = false; self.textInputOpen = false
+            self.connected = false; self.hasVolume = false; self.textInputOpen = false; self.pointerMode = false
             self.pauseUsage()
             self.log("Connection lost", failure.localizedDescription)
             if !self.connecting {
@@ -171,7 +174,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         pauseUsage()
         fileServer?.stop(); fileServer = nil; casting = false
         autoReconnect = false; connectTask?.cancel(); reconnectTask?.cancel(); refreshTask?.cancel(); volumeTask?.cancel(); iconTask?.cancel()
-        connection?.close(); connection = nil; connected = false; connecting = false; pairing = false; hasVolume = false; textInputOpen = false
+        connection?.close(); connection = nil; connected = false; connecting = false; pairing = false; hasVolume = false; textInputOpen = false; pointerMode = false
         renderer = nil; apps = []; appsFromCatalog = false
         activity.reset()
     }
@@ -273,7 +276,17 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func swipePointer(dx: Double, dy: Double) {
         guard connected else { return }
+        if pointerMode {
+            guard let move = swipe.pointer(dx: dx, dy: dy) else { return }
+            perform { client in try await client.movePointer(x: move.x, y: move.y) }
+            return
+        }
         for key in swipe.drag(dx: dx, dy: dy) { press(key) }
+    }
+    func tapSwipe() {
+        guard pointerMode else { press("KEY_ENTER"); return }
+        log("Remote", "Pointer click")
+        perform { client in try await client.clickPointer() }
     }
     func endSwipe() { swipe.end() }
     func launch(_ app: TVApp) {

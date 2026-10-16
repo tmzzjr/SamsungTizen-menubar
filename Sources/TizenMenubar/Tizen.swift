@@ -129,6 +129,11 @@ enum TizenMessage {
         ["method": "ms.remote.control", "params": ["Cmd": Data(text.utf8).base64EncodedString(), "DataOfCmd": "base64", "TypeOfRemote": "SendInputString"]]
     }
     static let textEnd: [String: Any] = ["method": "ms.remote.control", "params": ["TypeOfRemote": "SendInputEnd"]]
+    /// Relative pointer move; the TV only shows the pointer in screens that announce ms.remote.touchEnable.
+    static func pointerMove(x: Int, y: Int) -> [String: Any] {
+        ["method": "ms.remote.control", "params": ["Cmd": "Move", "Position": ["x": x, "y": y, "Time": "0"], "TypeOfRemote": "ProcessMouseDevice"]]
+    }
+    static let pointerClick: [String: Any] = ["method": "ms.remote.control", "params": ["Cmd": "LeftClick", "TypeOfRemote": "ProcessMouseDevice"]]
     static func emit(_ event: String, data: [String: Any]? = nil) -> [String: Any] {
         var params: [String: Any] = ["event": event, "to": "host"]
         if let data { params["data"] = data }
@@ -198,6 +203,8 @@ private final class PingResult: @unchecked Sendable {
     var onDisconnect: ((Error) -> Void)?
     var onEvent: ((String, String) -> Void)?
     var onTextInput: ((Bool) -> Void)?
+    /// True while the screen on the TV takes a pointer (the web browser); arrow keys do nothing there.
+    var onPointer: ((Bool) -> Void)?
     var onCertificateTrust: (@MainActor (String, String) async -> Bool)?
     init(host: String) {
         self.host = host
@@ -295,6 +302,8 @@ private final class PingResult: @unchecked Sendable {
         switch event {
         case "ms.remote.imeStart": onTextInput?(true)
         case "ms.remote.imeEnd": onTextInput?(false)
+        case "ms.remote.touchEnable": onPointer?(true)
+        case "ms.remote.touchDisable": onPointer?(false)
         case "ms.error":
             let message = (object["data"] as? [String: Any])?["message"] as? String ?? "The TV rejected the command."
             onEvent?("Error", message)
@@ -347,6 +356,8 @@ private final class PingResult: @unchecked Sendable {
         try await send(TizenMessage.text(text))
     }
     func finishText() async throws { try await send(TizenMessage.textEnd) }
+    func movePointer(x: Int, y: Int) async throws { try await send(TizenMessage.pointerMove(x: x, y: y)) }
+    func clickPointer() async throws { try await send(TizenMessage.pointerClick) }
     func installedApps() async throws -> [TizenApp] {
         onEvent?("Read", "ed.installedApp.get")
         guard let answer = try await exchange(TizenMessage.emit("ed.installedApp.get"), events: ["ed.installedApp.get"], timeout: 4) else {

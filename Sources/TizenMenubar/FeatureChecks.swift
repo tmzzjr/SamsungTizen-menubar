@@ -73,6 +73,12 @@ enum FeatureChecks {
             return data["action_type"] as? String
         }
         try equal(try launchType(2), "DEEP_LINK"); try equal(try launchType(4), "NATIVE_LAUNCH"); try equal(try launchType(nil), "DEEP_LINK")
+        let move = (try json(TizenMessage.pointerMove(x: 12, y: -3)))["params"] as? [String: Any] ?? [:]
+        try equal(move["Cmd"] as? String, "Move"); try equal(move["TypeOfRemote"] as? String, "ProcessMouseDevice")
+        let position = move["Position"] as? [String: Any] ?? [:]
+        try equal(position["x"] as? Int, 12); try equal(position["y"] as? Int, -3); try equal(position["Time"] as? String, "0")
+        let click = (try json(TizenMessage.pointerClick))["params"] as? [String: Any] ?? [:]
+        try equal(click["Cmd"] as? String, "LeftClick"); try equal(click["TypeOfRemote"] as? String, "ProcessMouseDevice")
         guard let url = TizenMessage.channelURL(host: "192.0.2.10", token: "12345678"),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { throw RemoteError.message("Channel URL is invalid") }
         try equal(url.scheme, "wss"); try equal(url.port, 8002); try equal(url.path, "/api/v2/channels/samsung.remote.control")
@@ -148,6 +154,12 @@ enum FeatureChecks {
         pad.end()
         try equal(pad.drag(dx: -29, dy: 0), [])
         try equal(pad.drag(dx: -1, dy: 0), ["KEY_LEFT"])
+        var pointer = SwipePad(gain: 3)
+        try truth(pointer.pointer(dx: 0.2, dy: 0) == nil)
+        let first = pointer.pointer(dx: 0.2, dy: -2)
+        try equal(first?.x, 1); try equal(first?.y, -6)
+        pointer.end()
+        try truth(pointer.pointer(dx: 0.3, dy: 0) == nil)
     }
     static func testRendererResponsesAreParsed() throws {
         let volume = "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetVolumeResponse xmlns:u=\"urn:schemas-upnp-org:service:RenderingControl:1\"><CurrentVolume>13\n</CurrentVolume></u:GetVolumeResponse></s:Body></s:Envelope>"
