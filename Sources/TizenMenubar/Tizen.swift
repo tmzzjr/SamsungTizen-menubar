@@ -354,12 +354,39 @@ private final class PingResult: @unchecked Sendable {
         }
         return TizenApp.list(answer)
     }
-    func launch(_ appID: String, type: Int?) async throws {
+    /// Tizen 5.5 drops the Smart View launch frame without an error. DIAL (the casting service the
+    /// phone apps use) opens the apps registered there, the REST endpoint opens the rest, and the
+    /// frame stays as the last try for older firmware.
+    func launch(_ appID: String, type: Int?, dial: String?) async throws {
+        if let dial, await launchThroughDIAL(dial) { return }
+        if await launchThroughREST(appID) { return }
         // Some firmware opens the app without confirming it, so silence is not a failure.
         let answer = try await exchange(TizenMessage.launch(appID, type: type), events: ["ed.apps.launch", "ms.error"], timeout: 4)
         if answer?["event"] as? String == "ms.error" {
             throw RemoteError.message((answer?["data"] as? [String: Any])?["message"] as? String ?? "The TV could not open this app.")
         }
+    }
+    /// DIAL answers 201 when it starts the app and also brings an app running in the background to the front.
+    private func launchThroughDIAL(_ name: String) async -> Bool {
+        var components = URLComponents()
+        components.scheme = "http"; components.host = host; components.port = 8080; components.path = "/ws/apps/\(name)"
+        guard let url = components.url else { return false }
+        var request = URLRequest(url: url, timeoutInterval: 6)
+        request.httpMethod = "POST"; request.httpBody = Data()
+        request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        guard let (_, response) = try? await session.data(for: request) else { return false }
+        return [200, 201].contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+    /// Uses the pinned certificate of the Smart View port; the TV answers `true` once the app is open.
+    private func launchThroughREST(_ appID: String) async -> Bool {
+        var components = URLComponents()
+        components.scheme = "https"; components.host = host; components.port = TVCertificateTrust.port
+        components.path = "/api/v2/applications/\(appID)"
+        guard let url = components.url else { return false }
+        var request = URLRequest(url: url, timeoutInterval: 8)
+        request.httpMethod = "POST"
+        guard let (data, response) = try? await session.data(for: request), (response as? HTTPURLResponse)?.statusCode == 200 else { return false }
+        return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) != "false"
     }
     func icon(_ path: String) async throws -> Data {
         let answer = try await exchange(TizenMessage.emit("ed.apps.icon", data: ["iconPath": path]), events: ["ed.apps.icon"], timeout: 6)

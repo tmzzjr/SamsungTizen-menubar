@@ -279,7 +279,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func launch(_ app: TVApp) {
         log("Launch app", app.title)
         changeActivity { $0.opened(.app(app.id)) }
-        perform { client in try await client.launch(app.id, type: app.type) }
+        let dial = AppCatalog.match(title: app.title, id: app.id)?.dial
+        perform { client in try await client.launch(app.id, type: app.type, dial: dial) }
     }
     func changeVolume(_ value: Double) {
         volume = min(100, max(0, value)); volumeTask?.cancel(); volumeEdited = Date()

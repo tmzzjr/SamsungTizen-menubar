@@ -9,6 +9,8 @@ struct CatalogApp: Codable {
     let ids: [String]?
     /// 4 for native Tizen apps; store apps (2) open through a deep link.
     let type: Int?
+    /// Name under the TV's DIAL service (port 8080), the most reliable way to open these apps.
+    let dial: String?
 }
 
 /// Bundled tiles for well-known apps, matched by the name the TV reports. Tizen 5 and later

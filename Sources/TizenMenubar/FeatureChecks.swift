@@ -121,6 +121,8 @@ enum FeatureChecks {
         let ids = AppCatalog.entries.flatMap { $0.ids ?? [] }
         try equal(Set(ids).count, ids.count)
         try equal(AppCatalog.match(title: "Internet")?.type, 4)
+        try equal(AppCatalog.match(title: "Unknown name", id: "3201907018807")?.dial, "Netflix")
+        try equal(AppCatalog.match(title: "Prime Video")?.dial, "AmazonInstantVideo")
     }
     static func testActivityTracksWhatThisMacOpened() throws {
         var activity = TVActivity()
